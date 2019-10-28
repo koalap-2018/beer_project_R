@@ -1,0 +1,632 @@
+Beer Recipe Data analysis by Paola Correa
+========================================================
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+#here we load libraries tthat we need to use
+library(ggplot2)
+library(gplots)
+library(dplyr)
+library(gridExtra)
+library(GGally)
+library(corrplot)
+library(ggfortify)
+#settng global dimenssion s and visualizations
+knitr::opts_chunk$set(fig.width=9,fig.height=5,fig.path='Figs/',
+                      fig.align='center',tidy=TRUE,
+                      echo=FALSE,warning=FALSE,message=FALSE)
+theme_set(theme_minimal(12))
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
+# Load the Data
+
+beer<-read.csv("recipeData.csv")
+
+```
+
+#Introduction:
+This data was obtained from the kaggle website. The original csv file contains 75,000 homebrew beer recipes with
+over 176 different styles. Beer records are user-reported and are classified according to one of the 176 different styles. These recipes go into as much or as little detail as the user provided. Additionally this data contains
+23 variblaes most of which are quatitive with 2 categorical ones. This data can be downloaded at: https://www.kaggle.com/jtrofe/beer-recipes#recipeData.csv
+
+
+# Univariate Plots Section
+
+#Data structure and summary:
+In the following structure we can see that the data has several factors, nums and ints. Also sevral N/A are embeded in 
+some of the variables. I willl clean these so that we can do more stats. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots}
+
+#here we get familiar with the data
+
+str(beer)
+summary(beer)
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Data_cleanup}
+
+#Here we convert some of the data we want to work on to numeric type, we check these
+
+beer$BoilGravity<-as.numeric(beer$BoilGravity)
+beer$MashThickness<-as.numeric(beer$MashThickness)
+beer$PitchRate<-as.numeric(beer$PitchRate)
+beer$PrimaryTemp<-as.numeric(beer$PrimaryTemp)
+
+
+#here we replace the N/A with NA so that we can do stats
+beer$BoilGravity[beer$BoilGravity=="N/A"]<-"NA"
+beer$MashThickness[beer$MashThickness=="N/A"]<-"NA"
+beer$PitchRate[beer$PitchRate=="N/A"]<-"NA"
+beer$PrimaryTemp[beer$PrimaryTemp=="N/A"]<-"NA"
+
+
+```
+
+
+We will start analysing the color varibale for all the beer recipes.First we observe the summary of 
+color variable to get an idea of the data limits and proceed to plot the raw counts.As we van see with the raw data there are very few counts above 80.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Color_counts_summary}
+
+#here we plot the color counts and transform the data as log10
+#here we will investigat the color variable that is from 0-40 (40 being hte darkest)
+
+summary(beer$Color)
+ggplot(data = beer, aes(x = Color)) +
+  geom_histogram(binwidth = 1) +
+  scale_x_continuous(limits = c(0, 186), breaks = seq(0, 186, 40))
+
+
+
+```
+
+Based on the graph above I plot the log 10 transformation to help visulaize the data much more.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Color_counts_log10}
+
+#this transformation makes the distribution of the data look much clearer
+
+ggplot(aes(log10(beer$Color+1)),data=beer)+
+  geom_histogram(binwidth = 0.01) +
+  geom_histogram(col='black', 
+                 aes(fill=..count..))+
+  scale_fill_gradient("Count", low="green", high="red")
+
+```
+
+This graph shows us that the distributioin is slightly binomial. HIgher counts are seen at 0.8
+and 1.6, suggesting that beers are mostly made in teh lighter scales but a quite a few in the darker.
+
+Next we will plot histograms for several other varibales such as ABV, IBU, BoilTime,  OG (specific gravity of wort before fermentation), FG(specific gravity of wort after fermentation). 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, ABV_uni}
+
+#this is the ABV data distribution
+
+ggplot(aes(x = ABV), data = beer) +
+  geom_histogram(binwidth = 0.1)+
+  scale_x_continuous(limits = c(0,20), breaks = seq(0,20, 5))
+
+```
+
+Here we see the ABV distribution is normal and has the highest counts arround 6-8 ABV.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, IBU_uni}
+
+#This is the IBU data with the log10 transformation
+ggplot(aes(log10(x = beer$IBU+1)), data = beer) +
+  geom_histogram(binwidth = 0.01)+
+  ylim(0,1500)
+
+```
+
+Here we see the IBU distribuition also normal and with highest counts at 1.5 IBUs
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Boiltime_uni}
+
+
+#here we plot distributions by BoilTIme 
+ggplot(data = beer, aes(x = BoilTime)) +
+  geom_histogram(binwidth = 5)+
+  scale_x_continuous(limits = c(0, 160), breaks = seq(0, 160, 20))
+
+```
+
+Here we see the Boiltime has the highest counts at 1hr and next highest at 1.5hrs.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, OG_uni}
+#here we plot the OG with the meadian as the median better represents
+#where most of the data is found
+
+ggplot(data = beer, aes(x = OG)) +
+  geom_histogram(binwidth = 0.01)+
+  coord_cartesian(xlim=c(1,1.2))+
+  geom_vline(aes(xintercept=median(OG, na.rm=T)),   # Ignore NA values for median
+             color="red", linetype="dashed", size=1)
+
+```
+
+Here we see that the OG distibuion is centered arround the 1.07 median (colored in red)
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, FG_uni}
+
+#here we plot the FG with the meadian similar to above
+ggplot(data = beer, aes(x = FG)) +
+  geom_histogram(binwidth = 0.005)+
+  coord_cartesian(xlim=c(0.95,1.1))+
+  geom_vline(aes(xintercept=median(FG, na.rm=T)),   # Ignore NA values for median
+             color="red", linetype="dashed", size=1)
+
+```
+
+Here we see that the FG distibuion is centered arround the 1.03 median (colored in red)
+
+
+I am interested in looking in more detail at the alcohol by volume across beer samples. To look at this I constructed a new categorical variable called ABV_ranges. In the first table we see the count of ranges. Then I plotted these ABV categories as percentages in a pie chart.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, ABV_ranges}
+
+#FOr better visualization i want to subset the ABV for ranges of ABV
+#need to transform it into integers first for it to be ranges 
+beer$ABV_int<-as.integer(beer$ABV)
+#here we arbitrarily set the ranges
+beer$ABV_ranges<-cut(beer$ABV_int,
+                     c(0,3,4,5,6,8,10,50),
+                     labels = c("0 to 3","3 to 4","4 to 5","5 to 6","6 to 8","8 to 10","10 to 50"))
+
+##Here we create a df with the ABV ranges and arrange them by order
+ABV_ranges_count <- beer %>%
+  count(ABV_ranges) %>%
+  top_n(10) %>%
+  arrange(n, ABV_ranges)
+#here we check and realize there are 168 with NA values... since this is small number 
+#I remove this from the DF
+head(ABV_ranges_count)
+ABV_ranges_count_NONA<-ABV_ranges_count[-c(1), ]
+
+# Here we plot a pie chart with Percentages of ranges
+#vector for slices
+slices <- c(ABV_ranges_count_NONA$n) 
+lbls <- c("Extremely high(>10)", "Very low(0-3)", "Very High(8-10)", "High(6-8)", 
+          "Low(3-4)", "Medium High(5-6)", "Medium(4-5)")
+#percentages calculations saved in pct variable and subsequent arrangement of data
+pct <- round(ABV_ranges_count_NONA$n/sum(ABV_ranges_count_NONA$n)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+#Plotting th pie
+pie(slices,labels = lbls, col=heat.colors(length(lbls)),
+    main="ABV ranges")
+
+
+```
+
+As we can see the most common ABV ranges are the Medium and Medium High ranges.
+
+
+Next we plot the top_10 beer styles
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Top10_Plots}
+
+#here we plot the top 10_styles 
+# top-10 common styles
+top_10_styles <- beer %>%
+  count(Style) %>%
+  top_n(10)%>%
+  arrange(n, Style)
+
+
+#top 10 bar plot
+top_10_stylesDF<- as.data.frame(top_10_styles)
+ggplot(top_10_styles, aes(x = reorder(Style, n), y = n)) + 
+  geom_bar(stat = "identity")+
+  xlab("Styles of beer")+
+  ylab("Frecuency")+
+  ggtitle("Fequency of beer style")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=0.5))
+
+
+```
+
+Here we see that the Amercian IPA and Amercian Brown Ale are teh most and least common beer styles respectivly.
+
+# Univariate Analysis
+
+
+### What is the structure of your dataset?
+My data set has 73861 observations and 23 variables. Only 2 of the 23 variables are categorical.
+The rest are quantitative. The scales and distributions of most of these variables are quite different.
+For instance the color variable which depicts beer color from ligthest to darkest has a bimodal distribution.
+Having a mode at ligther colors and another at the darker ones. The ABV, FG and OG are all normal unimodal
+distributions.The IBU distribution is sligthly skewed to the left, but once log transforemed (as seen her) this skewness goes away. The boilTime variable has very few unique times, having the most common boiltime at 60min. Plotting our 2 catagorical variables we can see that the most common Brew Method is All Grain and Sugar scale is Specific Gravity.
+
+### What is/are the main feature(s) of interest in your dataset?
+The main feuture of interest for me would be the ABU (alcohol per volume) as I would like to know whether homebrewers are making more alcoholic beers in general. Also, I am a homebrewere myself and would like to elucidate if there is any variable of the brewing process that could lead to higher alcohol content. 
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+It would be nice to see if any of the varibale or variables that indicate the recepi are corralated with ABV content.This would be done in the next sections. Another point that would help visualize the data better I thought
+was converting the ABV variable into ranges so that we could see which alcohol levels are more/less common.
+
+### Did you create any new variables from existing variables in the dataset?
+As mentioned above I created a couple new variables. ABV_ranges was created to see the distribution of alcohol depicted by ranges that go from Very Low to Extemely high. I also found the top10 most common styles of beeer and broke them up by ABV_ranges and Brewing Method. 
+
+### Of the features you investigated, were there any unusual distributions? \Did you perform any operations on the data to tidy, adjust, or change the form \of the data? If so, why did you do this?
+For the color variable I applied the log10 function as it seemed to be skewed and have 2 modes. This tranformation helped seen the symetry fo teh data better.Similarly the IBU was log10+1 transformed to reduce the skewness of the data. For the OG and FG I applied the coord_cartesian so that when ploting the median that we see in this graph is 
+the meadian of the whole data. The OG and FG both have few extreme outliers which is why the mean of both lies far from
+most of the data points. This is why I plotted the median, as in this case gives us a better idea of OG/FG measurements.
+
+
+# Bivariate Plots Section
+
+
+As a follow-up from the last section I will plot the top 10 common beer styles with proportions of the ABV ranges 
+and the Brew Method breakdowns
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, top10_style_ABV}
+
+
+#Top ten and colored by ABV ranges
+top_10_stylesALL <- beer %>%
+  count(Style) %>%
+  top_n(10) %>%
+  arrange(n, Style) %>%
+  mutate(Style = factor(Style, levels = unique(Style)))
+beer %>%
+  filter(Style %in% top_10_stylesALL$Style) %>%
+  mutate(Style = factor(Style, levels = rev(top_10_styles$Style))) %>%
+  ggplot(aes(x = Style,fill = ABV_ranges))+
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=0.5))+
+  geom_bar()
+
+
+```
+
+Here we can see that that similar to the whole distribution of ABV_ranges seen in the pie chart above, the most common
+styles also follow the trend of having medium to medium high ABV_ranges.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, top10_style_Biv}
+
+
+#top ten styles colore by BrewMethod
+top_10_stylesALL <- beer %>%
+  count(Style) %>%
+  top_n(10) %>%
+  arrange(n, Style) %>%
+  mutate(Style = factor(Style, levels = unique(Style)))
+beer %>%
+  filter(Style %in% top_10_stylesALL$Style) %>%
+  mutate(Style = factor(Style, levels = rev(top_10_styles$Style))) %>%
+  ggplot(aes(x = Style,fill = BrewMethod))+
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=0.5))+
+  geom_bar()
+
+
+```
+
+Here we see that the most common Brew Method in the top_10 styles is All Grain, and second most common one
+is BIAB. To follow this up I will plot the Brew Method proportions of the whole data set. I will break up this Brew Method by Sugar Scale to see whteher any Brew Method works the most with a particular Sugar Scale.
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, ABVIBU1_BIV_Plots}
+ 
+#here I plot a bar graph combining 2 categorical variables
+#prety graph of brewer methods and colored with the sugarscale
+ggplot(beer, aes(BrewMethod, fill = SugarScale)) + 
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=0.5))+
+  geom_bar()
+
+
+```
+
+This graph shows that similar to the top10 beer styles the ALL grain brewig method is the most common of the whole
+data set. Additionally, the most prevalent Sugar Scale in any of the Brew Methods is Specific Gravity; therefore this sugarScales is prefered for all Brewing Methods. 
+
+
+Next, I will plot the ABVs against IBU to test whether this variable correlates with ABV. Additionally
+will check the pearson correaltion coefficient to confirm postitive, negative or no correlations respectivly.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,Bivariate_IBU_ABV2Plots}
+
+
+#this is the IBU correlation
+cor.test(beer$ABV,beer$IBU, method='pearson',alternative='greater')
+
+#here we plot ABV with different varibales
+#First with IBU
+ggplot(aes(x=log10(IBU+1), y=ABV), data=subset(beer,ABV>3)) +
+  geom_point() +
+  geom_smooth()+
+  ggtitle("Bitterness vs alcohol content")
+
+
+```
+
+Here we see that there is a slightly possitive correlation. However, this might be because of over plotting. Next we proceed to subset the data to see whether this would help visualizing potential correlation. Since we know from previous graphs that most common ABV ranges are between 3-8. we will subset the data by these ranges to plot and calculate correlation coeficients. 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,Bivariate_AVBCOMMONPlots}
+
+#here we calculate the correlation with the most common ABV ranges (3-8)
+with(subset(beer,ABV<=8&ABV>=3), cor.test(ABV,IBU,method='spearman'))
+
+
+#Thi is a plot of IBu with a subset of the ABVs
+ggplot(aes(x=ABV, y=log10(IBU+1)), 
+       data=subset(beer, ABV<=8&ABV>=3))+
+  geom_jitter(alpha=1/5000, position=position_jitter(h=0))+
+  geom_smooth(method='lm',color='red',size=3)+
+  geom_point(size=0.1)
+
+```
+
+The correaltion with subset of the data seems more positive. Additionally, we can better visualize this realtionship better once we look at the 3-8 ranges. Next, we will see whether otehr variables have any relatuonships, such as OG and FG.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,Bivariate_OGFGPlots}
+#here we calculate the FG nad OG correlations
+cor.test(beer$OG,beer$FG, method='pearson',alternative='greater')
+
+
+#Here I plot the OG vs FG and regression line
+ggplot(aes(x=OG, y=FG), data=beer)+
+    coord_cartesian(xlim=c(0,25),ylim=c(0,10))+
+    geom_point()+
+    geom_smooth(method='lm',color='blue')+
+    ggtitle("Original vs Final Gravities")+
+   theme(plot.title = element_text(hjust = 0.5))
+    
+
+
+```
+
+As we can see from the correlation coeficient, OG anf FG have a pretty strong correlation. The graph of these variables shows this as well. Next, we will explore any relationships of ABV with categorica variables.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE,Bivariate_categorical_Plots}
+
+#Finaly we use the 2 categorical ones to plot it
+#save them into one boxplot, I saved them into a p1 adn p2 then use grid.arange  
+p1<-qplot(x=BrewMethod, y=ABV, 
+      data=subset(beer,ABV<=8&ABV>=3),
+      geom='boxplot', color=BrewMethod)+
+     coord_cartesian(ylim=c(2,8))
+
+p2<-qplot(x=SugarScale, y=ABV, 
+      data=subset(beer,ABV<=8&ABV>=3),
+      geom='boxplot', color=SugarScale)+
+  coord_cartesian(ylim=c(2,8))
+
+grid.arrange(p1,p2, ncol=1)
+
+
+```
+
+As we can see there isn't any particualr trned with neither Brewing Method nor Sugar Scales
+
+#Grouping variables and further plotting
+After haveing plot raw variables I realize that visualization might be better if we start grouping them and then plotting. Here I am groupng variables by IBU, BoitlTIme and OG and plotting them against the ABV_mean of those groups.
+After each plots I am running correlations to confrim what I find the graphs.
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Correlations_after_grouping}
+#grouping by IBU time and extracting the ABV_mean and median of these groups
+IBU_groups<-group_by(beer,IBU)
+beer_by_IBU<-summarise(IBU_groups,
+                        ABV_mean=mean(ABV),
+                        ABV_median=median(ABV),
+                        n=n())
+beer_by_IBU<-arrange(beer_by_IBU,IBU)
+#here I will get rid of zeros and convert IBU-group data to log10
+beer_by_IBUNOzeros <- beer_by_IBU[-c(1), ]
+#head(beer_by_IBUNOzeros)
+beer_by_IBUlog10<-log10(beer_by_IBUNOzeros+1)
+
+#Finally we plot the IBU transformed data vs ABV_mean
+
+  ggplot(aes(x=IBU, y=ABV_mean),data=(beer_by_IBUlog10))+
+    geom_point(size=0.5)+
+    geom_jitter(alpha=1/500)+
+    geom_smooth(method='lm',color='blue')+
+    xlab('log10IBU+1')+
+    ggtitle("IBU vs ABV_mean")+
+    theme(plot.title = element_text(hjust = 0.5))
+#Since the graph shows a positive correlation we can verufy that with coeficient
+#here we calculate the correlation coeficient for the mean of ABV and IBU
+cor.test(beer_by_IBUNOzeros$ABV_mean,beer_by_IBUNOzeros$IBU, method='pearson',alternative='greater')
+
+
+```
+
+Here we see that the correlation between ABV and grouped IBU data has a much stronger correlation than the raw
+counts. We see this with both the coeficient and the plot.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Biv_Group_Plots2}
+
+#grouping by OG and extracting ABV mean, median, and count
+OG_groups<-group_by(beer,OG)
+beer_by_OG<-summarise(OG_groups,
+                       ABV_mean=mean(ABV),
+                       ABV_median=median(ABV),
+                       n=n())
+beer_by_OG<-arrange(beer_by_OG,OG)
+
+
+#plot ABV mean by OG
+ggplot(aes(x=OG, y=ABV_mean),data=(beer_by_OG))+
+  geom_point()+
+  geom_smooth(method='lm',color='blue')+
+  coord_cartesian(xlim = c(1,34), ylim = c(0,30))+
+  ggtitle("OG vs ABV_mean")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#here we calculate the correlation coeficient for the mean of ABV and IBU
+cor.test(beer_by_OG$ABV_mean,beer_by_OG$OG, method='pearson',alternative='greater')
+
+```
+
+Here we see the correaltion of ABV with the OG is slightly negative. However, this is hard to interpret as the distribution for OG is complex. This distribution has most data points around 1, and others between 10-30.
+
+
+# Bivariate Analysis
+
+
+### Talk about some of the relationships you observed in this part of the \investigation. How did the feature(s) of interest vary with other features in the dataset?
+I mainly attempted to correlate the alcohol content (ABV) with quatitaive and categorical variables.
+Among the quatitative ABV seems to have a slightly positive correlation with IBU and Boil Time. Hoewever, the
+relaionship with OG is close to 0 so not very strong. There was no clear relationship witth the categorical values
+of BRewMethod or SugarScale.
+
+
+### Did you observe any interesting relationships between the other features \(not the main feature(s) of interest)?
+The original and the FInal gravities have a very strong positive correlation.This would suggest that during the brewing process original gravities increase linearly.Nonetheless, the OG has a neutral to negatice correlation with ABV_mean. 
+
+### What was the strongest relationship you found?
+The Original and the FInal Gravities correlation. 
+
+# Multivariate Plots Section
+
+First we will only consider the quantitative data and transform everything to numeric, then will plot a 
+correlation matrix of the remaining variables (12)
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Multivariate_Plots}
+#CLEANING up data a bit
+#First we have to get rid of some columns that are not relevant for this kind of a nalysis
+beer_subset <- beer[,6:20]
+#here we drop the categorical variables
+beer_subset$Color<- NULL
+beer_subset$SugarScale<- NULL
+beer_subset$BrewMethod<- NULL
+#Replace the 'N/As'
+beer_subset[beer_subset=='N/A']<- NA
+#is.na(beer_subset)
+#head(beer_subset)
+#Here we remove all missing values accorss rows
+beer_subset_Clean <- beer_subset[complete.cases(beer_subset[,1:12]), ]
+#here we transform these variables to numeric
+beer_subset_Clean$BoilGravity<-as.numeric(beer_subset_Clean$BoilGravity)
+beer_subset_Clean$MashThickness<-as.numeric(beer_subset_Clean$MashThickness)
+beer_subset_Clean$PitchRate<-as.numeric(beer_subset_Clean$PitchRate)
+beer_subset_Clean$PrimaryTemp<-as.numeric(beer_subset_Clean$PrimaryTemp)
+
+#Here we plot a correlation matrix
+#here we are going to plot a correclation matrix of the clean data
+corr_beer_matrix<-cor(beer_subset_Clean)
+corrplot::corrplot(corr_beer_matrix)
+
+
+```
+
+Similar to what we saw with our Bivariate analysis the OG and FG relationship is strong. The only variable taht ABV seems to have a positive correaltion is the IBU. THis correlation is similar to what we observed in the bivarate analysis. Interestinglu, the only negatie strong correlations that we can see are the Effectiveness and Mashtickness.
+
+Next we are going to do a reduction of the data dimensions with PCA analysis. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, PCA_plots1}
+#PCA analysis of the data
+beer_pca <- prcomp(beer_subset_Clean)
+#Here we get an idea of the principal components and STDEV
+summary(beer_pca)
+#here we standarize the variances becase of scales
+beer_pca1_stan<- prcomp(beer_subset_Clean, scale. = TRUE)
+summary(beer_pca1_stan)
+
+```
+
+In the first table you see the PCA analysis wihtout scale standarization and in the second with scale standarizarion. This scale satndarization is needed to reduce the satndard deviation, because the difference in scales or magnitudes of the variables. I will use the second standarized table results for further plotting.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, PCA_plots2}
+
+#here we plot the cumulative proportions vs PC components for visualization
+plot(cumsum( beer_pca1_stan$sdev^2 / sum( beer_pca1_stan$sdev^2) ), type="o", ylim=c(0:1), ylab="Cumulative proportion of variance", xlab="PC dimensions" )
+
+
+```
+
+In this graph we can see that the first and second component explain aproximatly 40% of the data. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, PCA_plots3}
+
+#this would plot the 2 compotnets by SugarScale witha scale of the data into consideration
+#ONLY this works now
+autoplot(prcomp(beer_subset_Clean, scale. = TRUE))
+
+
+```
+
+Here we plot the 2 components and see 2 trends one possitive and one negative. We will color these by the categorial variables in the last section.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \investigation. Were there features that strengthened each other in terms of \looking at your feature(s) of interest?
+
+In the correlation matrix we can see that there are sevral positve correlations, some of these are similar to what
+i observed with the bivariate analysis. Howerver, this gives us a more global view of the whole quantitaive data set.
+ABV was modeslty correlated with IBU and Color. I also used PCA analysis to try and reduce the dimentionality of this data and found tha 98% of the variance could be explained by 9 components. This could help to modelthe data in the future.
+
+### Were there any interesting or surprising interactions between features?
+The correation matrix shows addintional Biol gravity seems to be slightly correlated with ABV and more strongly with OG and FG. When plotting the 2 first components of the PCA we get some clustreting of the data by Sugar Scale. This was not observed by ABV_ranges (data not shown)
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_One}
+#PLOT1
+# Here we plot a pie chart with Percentages of ranges
+slices <- c(ABV_ranges_count_NONA$n) 
+lbls <- c("(>10)", "(0-3)", "(8-10)", "(6-8)", "(3-4)","(5-6)", "(4-5)")
+pct <- round(ABV_ranges_count_NONA$n/sum(ABV_ranges_count_NONA$n)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(slices,labels = lbls, col=heat.colors(length(lbls)),
+    main="Percentages of ABV ranges in homebrew beer recipes")
+legend("topleft", c("Extremely high(>10)", "Very low(0-3)", "Very High(8-10)", "High(6-8)", "Low(3-4)",
+                     "Medium High(5-6)", "Medium(4-5)"), cex=0.6, fill=heat.colors(length(lbls)))
+
+
+```
+
+### Description One
+My interest was to figure out alcoholic preferences in hombrew beer. For this it was useful to set ranges of ABV and then analyse the proportion of these in the beer recipe data.Here we can clearly see the percentages of the ABV (alcohol by volume) ranges in the entire data set. We can observe that the most common ABV_ranges in the data are among intermediate to high levels of alcohol. Very few
+homebrewers make really high or really low alcohol content beers.
+
+### Plot Two
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Two}
+#Here we plot the correlation matrix of quantitative values
+corr_beer_matrix<-cor(beer_subset_Clean)
+corrplot::corrplot(corr_beer_matrix,title="Correlation Matrix",mar=c(0,0,1,0))
+```
+
+### Description Two
+Another intereest of mine was to find the correlations between ABV and other variables in the data set. This correlation matrix shows all the correlations of quantitative data of beer recipes. We can observe that ABV has strong possitive correlation with itself, suggesting our method is correct, and we can easily visualize at once its possitive correlation with IBU, and minorly with Boil TIme and Boil Gravity. 
+
+### Plot Three
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Three}
+autoplot(prcomp(beer_subset_Clean, scale. = TRUE), data = beer, colour = 'ABV_ranges')
+autoplot(prcomp(beer_subset_Clean, scale. = TRUE), data = beer, colour = 'SugarScale')
+```
+
+### Description Three
+Here i included 2 PCA plots because I wanted to contrast a weak grouping variable (ABV_ranges) and a modest one (SUgarScale) in addition to include categorical variables for seing more global data patterns.Here we reduced the  dimensions of the data to 2 componnets. It is surprising that there seems to be a positive and negative PC correlations, these 2 cannot be grouped by the ABV_ranges but with the Sugarscale they line up nicely.
+
+------
+
+# Reflection
+
+This dataset was very interesting I believe the univarite and bivariate analysis went well and showed some interesting trends. I think it made sense that the IBU goes in hand with ABV, as they showed a positive correlation. It was very surprising that people brew mostly intermediate alcoholic beers instead of going for higher ABV's. 
+This was my first time using R for such a big data set. I struggled a bit when it came to do the bivariate and PCA plots as the outputs where not quick enough in my computer. As a first timer this can be a little frustrating since I needed a lot of adapting the code and running the script. For future work I would have liked to learn more about modeling the data. I wished to find a model that predicts based not only on 1 varible but on a set of variables.
